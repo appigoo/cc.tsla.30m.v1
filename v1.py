@@ -1360,6 +1360,9 @@ def _merge_dims_to_conds(
     return merged[_TG_COLS]
 
 
+# st.title("📊 股票監控儀表板")
+# st.caption(f"⏱ 更新時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+###
 st.title("📊 股票監控儀表板")
 
 # ── 總開關（置頂）────────────────────────────────────────────────────────────
@@ -1396,6 +1399,7 @@ with col_status:
         st.warning("⏸️ 已停止，調好參數後按啟動", icon="⚙️")
 
 st.caption(f"⏱ 更新時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+###
 
 # ── 全域 Telegram 開關 ────────────────────────────────────────────────────────
 if selected_tickers:
