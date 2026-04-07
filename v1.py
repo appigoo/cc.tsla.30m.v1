@@ -3055,22 +3055,63 @@ with tabs[-1]:
 # time.sleep(REFRESH_INTERVAL)
 # st.rerun()
 ###
+# st.divider()
+# col_l, col_r = st.columns([4, 1])
+
+# if "last_refresh" not in st.session_state:
+#     st.session_state["last_refresh"] = time.time()
+
+# _elapsed = time.time() - st.session_state["last_refresh"]
+# _remaining = max(0, REFRESH_INTERVAL - int(_elapsed))
+
+# with col_l:
+#     st.info(f"📡 自動刷新倒計時：**{_remaining}** 秒（間隔 {REFRESH_INTERVAL} 秒）")
+# with col_r:
+#     if st.button("🔄 立即刷新"):
+#         st.session_state["last_refresh"] = time.time()
+#         st.rerun()
+
+# if _elapsed >= REFRESH_INTERVAL:
+#     st.session_state["last_refresh"] = time.time()
+#     st.rerun()
 st.divider()
-col_l, col_r = st.columns([4, 1])
 
+# ── 總開關 ────────────────────────────────────────────────────────────────────
+if "app_running" not in st.session_state:
+    st.session_state["app_running"] = False
 if "last_refresh" not in st.session_state:
-    st.session_state["last_refresh"] = time.time()
+    st.session_state["last_refresh"] = 0.0
 
-_elapsed = time.time() - st.session_state["last_refresh"]
-_remaining = max(0, REFRESH_INTERVAL - int(_elapsed))
+col_btn1, col_btn2, col_status = st.columns([1, 1, 4])
 
-with col_l:
-    st.info(f"📡 自動刷新倒計時：**{_remaining}** 秒（間隔 {REFRESH_INTERVAL} 秒）")
-with col_r:
-    if st.button("🔄 立即刷新"):
+with col_btn1:
+    if not st.session_state["app_running"]:
+        if st.button("▶️ 啟動監控", type="primary", use_container_width=True):
+            st.session_state["app_running"] = True
+            st.session_state["last_refresh"] = time.time()
+            st.rerun()
+    else:
+        if st.button("⏹️ 停止監控", type="secondary", use_container_width=True):
+            st.session_state["app_running"] = False
+            st.rerun()
+
+with col_btn2:
+    if st.session_state["app_running"]:
+        if st.button("🔄 立即刷新", use_container_width=True):
+            st.session_state["last_refresh"] = time.time()
+            st.rerun()
+
+with col_status:
+    if st.session_state["app_running"]:
+        _elapsed = time.time() - st.session_state["last_refresh"]
+        _remaining = max(0, REFRESH_INTERVAL - int(_elapsed))
+        st.success(f"🟢 監控運行中　｜　下次刷新：**{_remaining}** 秒後", icon="📡")
+    else:
+        st.warning("⏸️ 監控已停止　｜　請調整好參數後按「▶️ 啟動監控」", icon="⚙️")
+
+# ── 自動刷新（只在啟動狀態下才執行）────────────────────────────────────────────
+if st.session_state["app_running"]:
+    _elapsed = time.time() - st.session_state["last_refresh"]
+    if _elapsed >= REFRESH_INTERVAL:
         st.session_state["last_refresh"] = time.time()
         st.rerun()
-
-if _elapsed >= REFRESH_INTERVAL:
-    st.session_state["last_refresh"] = time.time()
-    st.rerun()
