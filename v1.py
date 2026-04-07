@@ -34,6 +34,29 @@ import json
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(page_title="📈 股票監控儀表板", layout="wide", page_icon="📈")
+# ── Telegram 去重工具函數 ──────────────────────────────────────────────────────
+def _tg_already_sent(key: str, cooldown_sec: int = 300) -> bool:
+    """
+    檢查某個信號是否在冷卻時間內已發送過。
+    key 格式建議：f"{ticker}_{信號名稱}_{日期時間精度}"
+    回傳 True = 已發送過（跳過），False = 可以發送
+    """
+    sent_log = st.session_state.setdefault("tg_sent_log", {})
+    now = time.time()
+    if key in sent_log:
+        if now - sent_log[key] < cooldown_sec:
+            return True  # 冷卻中，跳過
+    sent_log[key] = now
+    return False
+
+
+def _tg_clear_expired(cooldown_sec: int = 300):
+    """清理過期的發送記錄，避免 session_state 無限增長。"""
+    sent_log = st.session_state.get("tg_sent_log", {})
+    now = time.time()
+    expired = [k for k, t in sent_log.items() if now - t >= cooldown_sec]
+    for k in expired:
+        del sent_log[k]
 load_dotenv()
 
 SENDER_EMAIL    = os.getenv("SENDER_EMAIL", "")
@@ -1030,6 +1053,9 @@ with st.sidebar:
     BT_MIN_OCC       = st.number_input("最少次數",   2, 10, 3, 1)
     st.subheader("刷新")
     REFRESH_INTERVAL = st.selectbox("刷新間隔 (秒)", [30, 60, 90, 120, 180, 300], index=4)
+    st.subheader("Telegram 去重")
+    TG_COOLDOWN = st.number_input("信號冷卻時間 (秒)", 60, 3600, 300, 60,
+        help="同一信號在此時間內只發送一次，避免重複推播")
 
 # Pack params dict (avoids massive function signatures)
 PARAMS = dict(
@@ -1971,8 +1997,13 @@ for tab_idx, ticker in enumerate(selected_tickers):
                     if _s and _s not in _sig_dir_map:
                         _sig_dir_map[_s] = _p1_dir
 
+            _tg_clear_expired(TG_COOLDOWN)
             for sig in selected_signals:
                 if sig in K_list:
+                    _dedup_key = f"{ticker}_{sig}_{datetime.now().strftime('%Y%m%d_%H')}"
+                    if _tg_already_sent(_dedup_key, TG_COOLDOWN):
+                        st.toast(f"⏳ {sig} 冷卻中，跳過", icon="⏳")
+                        continue
                     # 方向優先從條件表讀取，否則從 SELL_SIGNALS 推斷
                     _p1_dir_val = _sig_dir_map.get(sig, "")
                     if not _p1_dir_val:
@@ -2175,12 +2206,12 @@ for tab_idx, ticker in enumerate(selected_tickers):
                     )
                 else:
                     for _mn, (_rank, _wr, _ci, _dir) in enumerate(_matched_list, start=1):
-                        _msg = _build_tg_msg(
-                            rank=_rank, backtest_wr=_wr,
-                            match_no=_mn, total_matches=_total_matched,
-                            direction=_dir,
-                        )
-                        _ok, _err = send_telegram_alert(_msg)
+                     _dedup_key = f"{ticker}_cond_{_rank}_{datetime.now().strftime('%Y%m%d_%H')}"
+                     if _tg_already_sent(_dedup_key, TG_COOLDOWN):
+                         st.toast(f"⏳ 條件 #{_rank} 冷卻中，跳過", icon="⏳")
+                         continue
+                     _msg = _build_tg_msg(...)
+                     _ok, _err = send_telegram_alert(_msg)
                         if _ok:
                             _send_ok_count += 1
                             st.toast(
@@ -2233,6 +2264,9 @@ for tab_idx, ticker in enumerate(selected_tickers):
                     f"成交量：{_fmt_vol(data['Volume'].iloc[-1])}  ({_cur_vol})\n"
                     f"方向：🟢 做多（買入）"
                 )
+                _bo_key = f"{ticker}_breakout_{datetime.now().strftime('%Y%m%d_%H')}"
+                if not _tg_already_sent(_bo_key, TG_COOLDOWN):
+                    _ok, _err = send_telegram_alert(_bo_msg)
                 if _tg_on_bo:
                     _ok, _err = send_telegram_alert(_bo_msg)
                     if _ok:
