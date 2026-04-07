@@ -3043,14 +3043,34 @@ with tabs[-1]:
 
 #  AUTO REFRESH (FIX: replace while True + time.sleep with time.sleep + st.rerun)
 # ═════════════════════════════════════════════════════════════════════════════
+###
+# st.divider()
+# col_l, col_r = st.columns([4, 1])
+# with col_l:
+#     st.info(f"📡 頁面將在 **{REFRESH_INTERVAL}** 秒後自動刷新")
+# with col_r:
+#     if st.button("🔄 立即刷新"):
+#         st.rerun()
 
+# time.sleep(REFRESH_INTERVAL)
+# st.rerun()
+###
 st.divider()
 col_l, col_r = st.columns([4, 1])
+
+if "last_refresh" not in st.session_state:
+    st.session_state["last_refresh"] = time.time()
+
+_elapsed = time.time() - st.session_state["last_refresh"]
+_remaining = max(0, REFRESH_INTERVAL - int(_elapsed))
+
 with col_l:
-    st.info(f"📡 頁面將在 **{REFRESH_INTERVAL}** 秒後自動刷新")
+    st.info(f"📡 自動刷新倒計時：**{_remaining}** 秒（間隔 {REFRESH_INTERVAL} 秒）")
 with col_r:
     if st.button("🔄 立即刷新"):
+        st.session_state["last_refresh"] = time.time()
         st.rerun()
 
-time.sleep(REFRESH_INTERVAL)
-st.rerun()
+if _elapsed >= REFRESH_INTERVAL:
+    st.session_state["last_refresh"] = time.time()
+    st.rerun()
